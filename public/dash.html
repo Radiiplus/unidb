@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADMIN</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        #fileContentTable {
+            display: none;
+        }
+
+        #addUpdateForm {
+            display: none;
+        }
+
+        #removeForm {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container mt-5">
+    <h1 class="text-center mb-4">Admin Panel</h1>
+
+    <!-- Button to create new JSONL file -->
+    <button id="createJsonlBtn" class="btn btn-primary mb-3">Create New Collection</button>
+
+    <!-- Input field to enter filename (initially hidden) -->
+    <div id="createJsonlInput" style="display: none;" class="form-group">
+        <label for="filenameInput">Enter Filename:</label>
+        <input type="text" class="form-control" id="filenameInput" placeholder="Enter filename">
+        <button id="submitFileBtn" class="btn btn-success mt-2">Submit</button>
+    </div>
+
+    <!-- Button to show form for adding or updating data -->
+    <button id="addUpdateBtn" class="btn btn-info mb-3">Add/Update Data</button>
+
+    <!-- Form for adding or updating data (initially hidden) -->
+    <div id="addUpdateForm">
+        <div class="form-group">
+            <label for="filenameSelect">Select File:</label>
+            <select class="form-control" id="filenameSelect">
+                <!-- Options will be filled dynamically -->
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="indexInput">Index:</label>
+            <input type="text" class="form-control" id="indexInput" placeholder="Index">
+        </div>
+        <div class="form-group">
+            <label for="uuidInput">UUID:</label>
+            <input type="text" class="form-control" id="uuidInput" placeholder="UUID">
+        </div>
+        <div id="attributeValueInputs">
+            <!-- Additional attribute and value inputs will be added dynamically -->
+        </div>
+        <button id="addAttributeBtn" class="btn btn-secondary mb-2">Add Attribute</button>
+        <button id="addUpdateDataBtn" class="btn btn-primary">Add/Update Data</button>
+    </div>
+
+    <!-- Button to show form for removing records or attributes -->
+    <button id="removeBtn" class="btn btn-danger mb-3">Remove Data</button>
+
+    <!-- Form for removing records or attributes (initially hidden) -->
+    <div id="removeForm">
+        <div class="form-group">
+            <label for="removeFilenameSelect">Select File:</label>
+            <select class="form-control" id="removeFilenameSelect">
+                <!-- Options will be filled dynamically -->
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="removeIndexInput">Index:</label>
+            <input type="text" class="form-control" id="removeIndexInput" placeholder="Index">
+        </div>
+        <div class="form-group">
+            <label for="removeUuidInput">UUID:</label>
+            <input type="text" class="form-control" id="removeUuidInput" placeholder="UUID">
+        </div>
+        <div class="form-group">
+            <label for="removeAttributeInput">Attribute:</label>
+            <input type="text" class="form-control" id="removeAttributeInput" placeholder="Attribute">
+        </div>
+        <button id="removeDataBtn" class="btn btn-primary">Remove Data</button>
+    </div>
+
+    <!-- List section -->
+    <div id="filesList"></div>
+
+    <!-- Table to display JSONL file content -->
+    <table id="fileContentTable" class="table mt-5">
+        <thead>
+            <tr id="tableHeaders">
+                <!-- Table headers will be dynamically filled -->
+            </tr>
+        </thead>
+        <tbody id="fileContentBody">
+            <!-- File content will be displayed here -->
+        </tbody>
+    </table>
+</div>
+
+<!-- jQuery -->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
+<script>
+    $(document).ready(function() {
+        // Show input field for creating new JSONL file when button is clicked
+        $('#createJsonlBtn').click(function() {
+            $('#createJsonlInput').toggle();
+        });
+
+        // Show form for adding or updating data when button is clicked
+        $('#addUpdateBtn').click(function() {
+            $('#addUpdateForm').toggle();
+        });
+
+        // Show form for removing data when button is clicked
+        $('#removeBtn').click(function() {
+            $('#removeForm').toggle();
+        });
+
+        // Load JSONL files on page load
+        $.get('/check', function(data) {
+            if (data.files.length === 0) {
+                $('#filesList').html('<p>No Collection found.</p>');
+            } else {
+                let fileList = '<ul>';
+                data.files.forEach(function(file) {
+                    fileList += `<li>${file}</li>`;
+                });
+                fileList += '</ul>';
+                $('#filesList').html(fileList);
+
+                // Populate select options with filenames
+                const options = data.files.map(file => `<option>${file}</option>`).join('');
+                $('#filenameSelect').html(options);
+                $('#removeFilenameSelect').html(options);
+            }
+        });
+
+        // Button click event to create new JSONL file
+        $('#submitFileBtn').click(function() {
+            const filename = $('#filenameInput').val();
+            if (!filename) {
+                alert('Please enter a filename.');
+                return;
+            }
+
+            $.ajax({
+                url: '/create',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ filename: filename }),
+                success: function(data) {
+                    alert(data.message + '\nFile name: ' + data.filename);
+                },
+                error: function() {
+                    alert('Failed to create JSONL file.');
+                }
+            });
+        });
+
+        // Show table with file content when filename in list is clicked
+        $('#filesList').on('click', 'li', function() {
+            const filename = $(this).text();
+            $.get(`/read/${filename}`, function(data) {
+                $('#fileContentBody').empty();
+                if (data.length === 0) {
+                    $('#fileContentTable').hide();
+                    alert('File is empty.');
+                } else {
+                    // Generate table headers dynamically based on attribute names
+                    const headers = Object.keys(data[0]).map(attribute => `<th>${attribute}</th>`).join('');
+                    $('#tableHeaders').html(headers);
+
+                    // Generate table rows dynamically based on attribute values
+                    const rows = data.map(record => {
+                        return '<tr>' + Object.values(record).map(value => `<td>${value}</td>`).join('') + '</tr>';
+                    }).join('');
+                    $('#fileContentBody').html(rows);
+
+                    $('#fileContentTable').show();
+                }
+            }).fail(function() {
+                alert('Failed to read file content.');
+            });
+        });
+
+        // Button click event to add attribute input fields
+        $('#addAttributeBtn').click(function() {
+            const attributeInput = $('<input type="text" class="form-control" placeholder="Attribute">');
+            const valueInput = $('<input type="text" class="form-control" placeholder="Value">');
+            $('#attributeValueInputs').append(attributeInput).append(valueInput);
+        });
+
+        // Button click event to add or update data
+        $('#addUpdateDataBtn').click(function() {
+            const filename = $('#filenameSelect').val();
+            const index = $('#indexInput').val();
+            const uuid = $('#uuidInput').val();
+
+            // Collect attribute-value pairs as an array of objects
+            const attributesValues = [];
+            $('#attributeValueInputs input').each(function() {
+                const attribute = $(this).val();
+                const value = $(this).next().val();
+                if (attribute && value) {
+                    attributesValues.push({ attribute: attribute, value: value });
+                }
+            });
+
+            // Split attribute-value pairs into separate arrays
+            const attributes = attributesValues.map(pair => pair.attribute);
+            const values = attributesValues.map(pair => pair.value);
+
+            $.ajax({
+                url: `/manipulate/${filename}`,
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ index: index, uuid: uuid, attributes: attributes, values: values }),
+                success: function(data) {
+                    alert(data.message);
+                },
+                error: function() {
+                    alert('Failed to add/update data.');
+                }
+            });
+        });
+
+        // Button click event to remove data
+        $('#removeDataBtn').click(function() {
+            const filename = $('#removeFilenameSelect').val();
+            const index = $('#removeIndexInput').val();
+            const uuid = $('#removeUuidInput').val();
+            const attribute = $('#removeAttributeInput').val();
+
+            $.ajax({
+                url: `/remove/${filename}`,
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ index: index, uuid: uuid, attribute: attribute }),
+                success: function(data) {
+                    alert(data.message);
+                },
+                error: function() {
+                    alert('Failed to remove data.');
+                }
+            });
+        });
+    });
+</script>
+
+<script>
+    $(document).ready(function() {
+        // Check if validation message exists in session storage
+        const validationMessage = sessionStorage.getItem('validationMessage');
+        if (!validationMessage) {
+            // If validation message doesn't exist, redirect to root page
+            window.location.href = '/';
+        } else {
+            // If validation message exists, display it
+            alert(validationMessage);
+            // Remove validation message from session storage
+            sessionStorage.removeItem('validationMessage');
+        }
+    });
+</script>
+
+
+</body>
+</html>
