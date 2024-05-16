@@ -1,0 +1,13 @@
+{
+  "name": "unidb",
+  "version": "1.0.0",
+  "description": "Unidb is a lightweight and scalable database management system (DBMS) service built using Express.js and designed for efficient data storage and retrieval.",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "morgan": "^1.10.0" 
+  }
+}
