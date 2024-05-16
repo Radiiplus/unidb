@@ -10,7 +10,7 @@ app.use(morgan('dev'));
 app.use(express.static('public'));
 app.use(express.json());
 
-const directoryPath = './'; // Root folder
+const filesDirectory = './files'; 
 
 app.get('/', async (req, res) => {
     const filePath = path.join(__dirname, 'public', 'index.html');
@@ -27,7 +27,7 @@ app.post('/compareKey', async (req, res) => {
     const { key } = req.body;
 
     try {
-        const data = await fs.readFile(path.join(__dirname, 'key.txt'), 'utf-8');
+        const data = await fs.readFile(path.join(__dirname, 'key', 'key.txt'), 'utf-8');
         const storedKey = data.trim(); // Trim to remove any extra whitespace
 
         // Compare keys
@@ -44,7 +44,7 @@ app.post('/compareKey', async (req, res) => {
 // Endpoint to check for existing JSONL files
 app.get('/check', async (req, res) => {
     try {
-        const files = await fs.readdir(directoryPath);
+        const files = await fs.readdir(filesDirectory);
         const jsonlFiles = files.filter(file => path.extname(file) === '.jsonl');
 
         if (jsonlFiles.length === 0) {
@@ -65,7 +65,7 @@ app.post('/create', async (req, res) => {
     }
 
     try {
-        await fs.writeFile(path.join(directoryPath, filename), '');
+        await fs.writeFile(path.join(filesDirectory, filename), '');
         return res.json({ message: 'File created successfully', filename });
     } catch (err) {
         return res.status(500).json({ error: 'Error creating file' });
@@ -76,7 +76,7 @@ app.post('/create', async (req, res) => {
 app.post('/manipulate/:filename', async (req, res) => {
     const { index, uuid, attributes, values } = req.body;
     const filename = req.params.filename;
-    const filePath = path.join(directoryPath, filename);
+    const filePath = path.join(filesDirectory, filename);
 
     try {
         const data = await fs.readFile(filePath, 'utf-8');
@@ -175,7 +175,7 @@ app.post('/manipulate/:filename', async (req, res) => {
 app.get('/read/:filename', async (req, res) => {
     const { id, attribute } = req.query;
     const filename = req.params.filename;
-    const filePath = path.join(directoryPath, filename);
+    const filePath = path.join(filesDirectory, filename);
 
     try {
         const data = await fs.readFile(filePath, 'utf-8');
@@ -206,7 +206,7 @@ app.get('/read/:filename', async (req, res) => {
 app.post('/remove/:filename', async (req, res) => {
     const { uuid, index, attribute } = req.body;
     const filename = req.params.filename;
-    const filePath = path.join(directoryPath, filename);
+    const filePath = path.join(filesDirectory, filename);
 
     try {
         const data = await fs.readFile(filePath, 'utf-8');
