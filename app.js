@@ -1,5 +1,5 @@
 const express = require('express');
-const fs = require('fs');
+const fs = require('fs').promises;
 const path = require('path');
 const morgan = require('morgan');
 
@@ -23,15 +23,11 @@ app.get('/', async (req, res) => {
 });
 
 // Endpoint to compare key
-app.post('/compareKey', (req, res) => {
+app.post('/compareKey', async (req, res) => {
     const { key } = req.body;
 
-    // Read key from key.txt file
-    fs.readFile(path.join(__dirname, 'key.txt'), 'utf-8', (err, data) => {
-        if (err) {
-            return res.status(500).json({ error: 'Error reading key file' });
-        }
-
+    try {
+        const data = await fs.readFile(path.join(__dirname, 'key.txt'), 'utf-8');
         const storedKey = data.trim(); // Trim to remove any extra whitespace
 
         // Compare keys
@@ -40,20 +36,15 @@ app.post('/compareKey', (req, res) => {
         } else {
             return res.status(401).json({ error: 'Unauthorized access' });
         }
-    });
+    } catch (err) {
+        return res.status(500).json({ error: 'Error reading key file' });
+    }
 });
 
 // Endpoint to check for existing JSONL files
-app.get('/check', (req, res) => {
-    if (!fs.existsSync(directoryPath)) {
-        return res.status(404).json({ error: 'Directory not found' });
-    }
-
-    fs.readdir(directoryPath, (err, files) => {
-        if (err) {
-            return res.status(500).json({ error: 'Error reading directory' });
-        }
-
+app.get('/check', async (req, res) => {
+    try {
+        const files = await fs.readdir(directoryPath);
         const jsonlFiles = files.filter(file => path.extname(file) === '.jsonl');
 
         if (jsonlFiles.length === 0) {
@@ -61,35 +52,34 @@ app.get('/check', (req, res) => {
         } else {
             return res.json({ files: jsonlFiles });
         }
-    });
+    } catch (err) {
+        return res.status(500).json({ error: 'Error reading directory' });
+    }
 });
 
 // Endpoint to create a new JSONL file
-app.post('/create', (req, res) => {
+app.post('/create', async (req, res) => {
     const { filename } = req.body;
     if (!filename) {
         return res.status(400).json({ error: 'Filename is required' });
     }
 
-    fs.writeFile(path.join(directoryPath, filename), '', err => {
-        if (err) {
-            return res.status(500).json({ error: 'Error creating file' });
-        }
+    try {
+        await fs.writeFile(path.join(directoryPath, filename), '');
         return res.json({ message: 'File created successfully', filename });
-    });
+    } catch (err) {
+        return res.status(500).json({ error: 'Error creating file' });
+    }
 });
 
 // Endpoint to manipulate JSONL file data
-app.post('/manipulate/:filename', (req, res) => {
+app.post('/manipulate/:filename', async (req, res) => {
     const { index, uuid, attributes, values } = req.body;
     const filename = req.params.filename;
     const filePath = path.join(directoryPath, filename);
 
-    fs.readFile(filePath, 'utf-8', (err, data) => {
-        if (err) {
-            return res.status(500).json({ error: 'Error reading file' });
-        }
-
+    try {
+        const data = await fs.readFile(filePath, 'utf-8');
         let records = data ? data.split('\n').filter(line => line.trim() !== '').map(JSON.parse) : [];
 
         // Check if attributes are defined without a uuid
@@ -113,16 +103,11 @@ app.post('/manipulate/:filename', (req, res) => {
                     }
                 });
             }
-            
+
             // Update file with new data
             const newData = records.map(record => JSON.stringify(record)).join('\n');
-            fs.writeFile(filePath, newData, err => {
-                if (err) {
-                    return res.status(500).json({ error: 'Error writing to file' });
-                }
-                return res.json({ message: 'File updated successfully' });
-            });
-            return; // End the function execution here
+            await fs.writeFile(filePath, newData);
+            return res.json({ message: 'File updated successfully' });
         }
 
         // Check if a record with matching uuid exists
@@ -153,12 +138,8 @@ app.post('/manipulate/:filename', (req, res) => {
 
             // Update file with updated data
             const newData = records.map(record => JSON.stringify(record)).join('\n');
-            fs.writeFile(filePath, newData, err => {
-                if (err) {
-                    return res.status(500).json({ error: 'Error writing to file' });
-                }
-                return res.json({ message: 'File updated successfully', newIndex: existingRecord.index });
-            });
+            await fs.writeFile(filePath, newData);
+            return res.json({ message: 'File updated successfully', newIndex: existingRecord.index });
         } else {
             // Auto index for new record
             const newIndex = records.length;
@@ -182,27 +163,22 @@ app.post('/manipulate/:filename', (req, res) => {
 
             // Update file with new data
             const newData = records.map(record => JSON.stringify(record)).join('\n');
-            fs.writeFile(filePath, newData, err => {
-                if (err) {
-                    return res.status(500).json({ error: 'Error writing to file' });
-                }
-                return res.json({ message: 'File updated successfully', newIndex });
-            });
+            await fs.writeFile(filePath, newData);
+            return res.json({ message: 'File updated successfully', newIndex });
         }
-    });
+    } catch (err) {
+        return res.status(500).json({ error: 'Error reading or writing to file' });
+    }
 });
 
 // Endpoint to read the content of a JSONL file
-app.get('/read/:filename', (req, res) => {
+app.get('/read/:filename', async (req, res) => {
     const { id, attribute } = req.query;
     const filename = req.params.filename;
     const filePath = path.join(directoryPath, filename);
 
-    fs.readFile(filePath, 'utf-8', (err, data) => {
-        if (err) {
-            return res.status(500).json({ error: 'Error reading file' });
-        }
-        
+    try {
+        const data = await fs.readFile(filePath, 'utf-8');
         let fileContent = data.split('\n')
                               .filter(line => line.trim() !== '')
                               .map(line => {
@@ -222,19 +198,18 @@ app.get('/read/:filename', (req, res) => {
         }
 
         return res.json(fileContent);
-    });
+    } catch (err) {
+        return res.status(500).json({ error: 'Error reading file' });
+    }
 });
 
-app.post('/remove/:filename', (req, res) => {
+app.post('/remove/:filename', async (req, res) => {
     const { uuid, index, attribute } = req.body;
     const filename = req.params.filename;
     const filePath = path.join(directoryPath, filename);
 
-    fs.readFile(filePath, 'utf-8', (err, data) => {
-        if (err) {
-            return res.status(500).json({ error: 'Error reading file' });
-        }
-
+    try {
+        const data = await fs.readFile(filePath, 'utf-8');
         let records = data ? data.split('\n').filter(line => line.trim() !== '').map(JSON.parse) : [];
 
         // Remove an attribute and its value from all records
@@ -255,13 +230,11 @@ app.post('/remove/:filename', (req, res) => {
 
         // Update file with new data
         const newData = records.map(record => JSON.stringify(record)).join('\n');
-        fs.writeFile(filePath, newData, err => {
-            if (err) {
-                return res.status(500).json({ error: 'Error writing to file' });
-            }
-            return res.json({ message: 'Records updated successfully' });
-        });
-    });
+        await fs.writeFile(filePath, newData);
+        return res.json({ message: 'Records updated successfully' });
+    } catch (err) {
+        return res.status(500).json({ error: 'Error reading or writing to file' });
+    }
 });
 
 app.get('/:page', async (req, res) => {
