@@ -1,5 +1,3 @@
-Sure, here's a documentation on how to use the CRUD operations provided by the server script from external sources:
-
 ### Base URL
 The base URL for accessing the server's endpoints is `http://your_server_address`
 
