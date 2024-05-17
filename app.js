@@ -2,15 +2,19 @@ const express = require('express');
 const fs = require('fs').promises;
 const path = require('path');
 const morgan = require('morgan');
+const AdmZip = require('adm-zip');
+const { execSync } = require('child_process');
+const readline = require('readline-sync');
+
 
 const app = express();
-const port = 3000;
+const port = 4000;
 
 app.use(morgan('dev'));
 app.use(express.static('public'));
 app.use(express.json());
 
-const filesDirectory = './files'; 
+const filesDirectory = './files'; // Folder for JSONL files
 
 app.get('/', async (req, res) => {
     const filePath = path.join(__dirname, 'public', 'index.html');
@@ -19,6 +23,106 @@ app.get('/', async (req, res) => {
         res.status(200).send(content);
     } catch (err) {
         res.status(404).send('404 Not Found');
+    }
+});
+
+async function zipFiles(folderPath) {
+    const zip = new AdmZip();
+
+    try {
+        // Read files in the folder
+        const files = await fs.readdir(folderPath);
+
+        // Add each file to the zip archive
+        for (const file of files) {
+            const filePath = path.join(folderPath, file);
+            zip.addLocalFile(filePath);
+        }
+
+        // Save the zip archive
+        const zipFilePath = path.join(folderPath, 'files.zip');
+        zip.writeZip(zipFilePath);
+
+        return zipFilePath;
+    } catch (error) {
+        console.error('Error zipping files:', error);
+        throw error;
+    }
+}
+
+// Function to post the zipped file to the specified endpoint using cURL
+async function postZipFileWithCurl(zipFilePath, endpoint) {
+    try {
+        const curlCommand = `curl -X POST -F "file=@${zipFilePath}" ${endpoint}`;
+        execSync(curlCommand);
+        console.log('File uploaded successfully.');
+    } catch (error) {
+        console.error('Error uploading file:', error.message);
+    }
+}
+
+app.post('/backup', async (req, res) => {
+    const folderPath = filesDirectory;
+    try {
+        const zipFilePath = await zipFiles(folderPath);
+        const endpoint = 'https://unicloud-adkw8trk.b4a.run/upload'; // Change this to your actual upload endpoint
+        postZipFileWithCurl(zipFilePath, endpoint);
+        return res.json({ message: 'Backup successful' });
+    } catch (error) {
+        return res.status(500).json({ error: 'Error creating zip file' });
+    }
+});
+
+// Function to download a file from the specified endpoint and extract its contents
+function restoreFiles(filename, downloadEndpoint, destinationFolder) {
+    return new Promise((resolve, reject) => {
+        try {
+            // Download the file
+            const curlCommand = `curl -o ${filename} ${downloadEndpoint}/${filename}`;
+            execSync(curlCommand);
+            console.log('File downloaded successfully.');
+
+            // Extract the zip file
+            const zip = new AdmZip(filename);
+            zip.extractAllTo(destinationFolder, /*overwrite*/ true);
+            console.log('Files extracted successfully.');
+
+            // Delete the zip file after extraction
+            fs.unlink(filename, (err) => {
+                if (err) {
+                    console.error('Error deleting zip file:', err.message);
+                    reject(err);
+                } else {
+                    console.log('Zip file deleted.');
+                    resolve();
+                }
+            });
+        } catch (error) {
+            console.error('Error restoring files:', error.message);
+            reject(error);
+        }
+    });
+}
+
+// Endpoint to handle the restore request
+app.post('/restore/:filename', async (req, res) => {
+    const filename = req.params.filename;
+    const downloadEndpoint = 'https://unicloud-adkw8trk.b4a.run/download'; // Replace with your actual download endpoint
+
+    if (!filename) {
+        return res.status(400).send('Filename is required');
+    }
+
+    try {
+        // Restore the files
+        await restoreFiles(filename, downloadEndpoint, filesDirectory);
+
+        // Send success JSON response
+        res.json({ success: true, message: 'Files restored successfully.' });
+    } catch (error) {
+        // Handle errors
+        console.error('Error restoring files:', error.message);
+        res.status(500).json({ success: false, error: 'Error restoring files' });
     }
 });
 
