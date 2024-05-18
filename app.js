@@ -65,7 +65,7 @@ app.post('/backup', async (req, res) => {
     const folderPath = filesDirectory;
     try {
         const zipFilePath = await zipFiles(folderPath);
-        const endpoint = 'https://unicloud-adkw8trk.b4a.run/upload'; // Change this to your actual upload endpoint
+        const endpoint = 'http://localhost/upload'; // Change this to your actual upload endpoint
         postZipFileWithCurl(zipFilePath, endpoint);
         return res.json({ message: 'Backup successful' });
     } catch (error) {
@@ -107,7 +107,7 @@ function restoreFiles(filename, downloadEndpoint, destinationFolder) {
 // Endpoint to handle the restore request
 app.post('/restore/:filename', async (req, res) => {
     const filename = req.params.filename;
-    const downloadEndpoint = 'https://unicloud-adkw8trk.b4a.run/download'; // Replace with your actual download endpoint
+    const downloadEndpoint = 'http://localhost/download'; // Replace with your actual download endpoint
 
     if (!filename) {
         return res.status(400).send('Filename is required');
